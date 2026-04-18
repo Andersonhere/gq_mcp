@@ -1,6 +1,6 @@
 # MCP 学习服务实现笔记（`learn_mcp_server`）
 
-本文整理本仓库中 **C++ MCP 学习服务** 从选型到运行、再到 Cursor 接入的完整过程，并说明**每一步在协议与工程上的作用**；**「四（续）」**概括 **HTTP + JSON-RPC 请求形态、接口目录、params/result 与典型场景**，并与 **`learn_mcp_server`** 已注册能力对齐。文末增加 **与 `learn_mcp_server.cpp`、`CMakeLists.txt` 逐段对照的源码导读**，便于把文字和真实代码对上号。
+本文整理本仓库中 **C++ MCP 学习服务** 从选型到运行、再到 Cursor 接入的完整过程，并说明**每一步在协议与工程上的作用**；**「四（续）」**概括 **HTTP + JSON-RPC 请求形态、接口目录、params/result 与典型场景**，并与 **`learn_mcp_server`** 已注册能力对齐；**§7** 给出可复制的 **`curl`** 序列（与 **`cpp-mcp`** 的 Streamable HTTP 实现一致）。文末增加 **与 `learn_mcp_server.cpp`、`CMakeLists.txt` 逐段对照的源码导读**，便于把文字和真实代码对上号。
 
 > **线上副本（GitHub Pages）**：[C++ MCP 学习服务实现笔记](https://andersonhere.github.io/cpp-mcp-learn-server-note/) — 正文修订以本仓库本文件为准。
 
@@ -330,6 +330,107 @@ cmake --build build --target learn_mcp_server -j"$(nproc)"
 | `tools/list` / `tools/call` | `register_tool` 与 `get_time_handler` / `echo_handler` / `calculator_handler` / `server_stats_handler` |
 | `resources/list` / `resources/read` / `resources/templates/list` | `register_resource`、`register_resource_template` |
 | `prompts/list` / `prompts/get` | `register_prompt_handlers` 内的 `register_method` |
+
+### 7. 附录：`curl` 真实请求序列（Streamable HTTP，`cpp-mcp` 实现）
+
+以下与 **`cpp-mcp`** 中 **`mcp_server.cpp::handle_mcp_post`** 行为一致（你本仓库子模块路径：`mcp/third_party/cpp-mcp/`）：
+
+- **`POST .../mcp` + `initialize`**：**不要**带 **`Mcp-Session-Id`**；响应 **HTTP 头**会下发 **`Mcp-Session-Id`**，正文为 **JSON-RPC result**。
+- **后续带 `id` 的 JSON-RPC 请求**（如 `tools/list`）：**必须**带请求头 **`Mcp-Session-Id: <上一步返回值>`**；且须先发送 **`notifications/initialized`**，否则 `process_request` 会返回 **`Session not initialized`**（见同文件 `is_session_initialized` 检查）。
+- **仅含通知、且无带 `id` 的请求**时，服务端可返回 **HTTP 202**，正文可能为空。
+- **`cpp-mcp` 客户端**用 `request::create_notification("initialized")` 发出的方法名为 **`notifications/initialized`**（前缀 `notifications/`），**JSON 中不出现 `id` 字段**。
+
+请先本地启动服务，例如：`./learn_mcp_server --host 127.0.0.1 --port 8080`。
+
+```bash
+# 按你的监听地址修改
+BASE=http://127.0.0.1:8080
+HDR=/tmp/mcp-curl.headers
+BODY=/tmp/mcp-curl.body
+```
+
+**（1）`initialize` — 建立会话，读取 `Mcp-Session-Id`**
+
+```bash
+curl -sS -D "$HDR" -o "$BODY" \
+  -H 'Content-Type: application/json' \
+  -H 'Accept: application/json' \
+  -X POST "$BASE/mcp" \
+  --data-binary '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"curl-demo","version":"0.0.1"}}}'
+
+# 从响应头取出会话 ID（macOS / Linux 常见写法）
+SID=$(grep -i '^mcp-session-id:' "$HDR" | head -1 | awk '{print $2}' | tr -d '\r')
+echo "Mcp-Session-Id=$SID"
+# 查看 JSON-RPC 结果（无 jq 时可改用 python3 -m json.tool）
+command -v jq >/dev/null && jq . <"$BODY" || cat "$BODY"
+```
+
+**（2）`notifications/initialized` — 通知（无 `id`），标记会话已就绪**
+
+```bash
+curl -sS -o /tmp/mcp-initdone.txt -w 'HTTP %{http_code}\n' \
+  -H 'Content-Type: application/json' \
+  -H "Mcp-Session-Id: $SID" \
+  -X POST "$BASE/mcp" \
+  --data-binary '{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}'
+# 常见为 202；正文可能为空
+```
+
+**（3）`tools/list`**
+
+```bash
+curl -sS \
+  -H 'Content-Type: application/json' \
+  -H "Mcp-Session-Id: $SID" \
+  -X POST "$BASE/mcp" \
+  --data-binary '{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}' | (command -v jq >/dev/null && jq . || cat)
+```
+
+**（4）`tools/call` — 示例 `get_time`**
+
+```bash
+curl -sS \
+  -H 'Content-Type: application/json' \
+  -H "Mcp-Session-Id: $SID" \
+  -X POST "$BASE/mcp" \
+  --data-binary '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"get_time","arguments":{}}}' | (command -v jq >/dev/null && jq . || cat)
+```
+
+成功时 **`result`** 内常见形态为：`{ "content": [ { "type": "text", "text": "..." } ], "isError": false }`（由 `cpp-mcp` 的 `tools/call` 封装层与 handler 共同组成）。
+
+**（5）`resources/read` — 示例静态 URI**
+
+```bash
+curl -sS \
+  -H 'Content-Type: application/json' \
+  -H "Mcp-Session-Id: $SID" \
+  -X POST "$BASE/mcp" \
+  --data-binary '{"jsonrpc":"2.0","id":4,"method":"resources/read","params":{"uri":"learn://docs/overview"}}' | (command -v jq >/dev/null && jq . || cat)
+```
+
+**（6）`ping`**
+
+```bash
+curl -sS \
+  -H 'Content-Type: application/json' \
+  -H "Mcp-Session-Id: $SID" \
+  -X POST "$BASE/mcp" \
+  --data-binary '{"jsonrpc":"2.0","id":5,"method":"ping","params":{}}' | (command -v jq >/dev/null && jq . || cat)
+```
+
+**（7）可选：关闭会话 — `DELETE /mcp`**
+
+```bash
+curl -sS -o /tmp/mcp-del.txt -w 'HTTP %{http_code}\n' \
+  -H "Mcp-Session-Id: $SID" \
+  -X DELETE "$BASE/mcp"
+```
+
+**排障提示**
+
+- 若返回 **`Missing Mcp-Session-Id header`**：说明该请求被判定为非 `initialize`，但未带头。
+- 若返回 **`Session not initialized`**：先检查是否已发 **`notifications/initialized`**（且方法名**不要**写成裸的 `initialized`，需与 `cpp-mcp` 一致）。
+- **`initialize` 上再次携带已有 `Mcp-Session-Id`** 可能被拒绝（实现中视为重复初始化）。
 
 ---
 
