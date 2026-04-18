@@ -12,7 +12,7 @@ learn_mcp_server — 部署与本地 Cursor 连接
   可执行文件: build/learn_mcp_server
 
   依赖: 在仓库根目录执行一次  git submodule update --init --recursive
-        以拉取 mcp/third_party/cpp-mcp（hkr04/cpp-mcp）。未初始化时 CMake 可能回退到 ../cpp-mcp-upstream 或 FetchContent。
+        以拉取 mcp/third_party/cpp-mcp（子模块远程：Andersonhere/cpp-mcp fork）。未初始化时 CMake 可能回退到 ../cpp-mcp-upstream 或 FetchContent（同样指向该 fork）。
 
 二、运行（监听所有网卡示例）
 ---------------------------

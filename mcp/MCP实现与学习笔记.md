@@ -37,7 +37,7 @@ gq_mcp/                        # 子模块根（远端：Andersonhere/gq_mcp）
 └── mcp/
     ├── CMakeLists.txt         # 构建：引入 cpp-mcp + 编译 learn_mcp_server
     ├── third_party/
-    │   └── cpp-mcp/           # Git 子模块（hkr04/cpp-mcp），需 git submodule update --init
+    │   └── cpp-mcp/           # Git 子模块（Andersonhere/cpp-mcp fork，源自 hkr04/cpp-mcp）
     ├── src/
     │   └── learn_mcp_server.cpp   # 学习用服务端入口与注册逻辑
     ├── DEPLOY.txt             # 部署与端口、防火墙要点
@@ -222,7 +222,7 @@ cmake --build build --target learn_mcp_server -j"$(nproc)"
 
 ```cmake
 set(CPP_MCP_DEFAULT "${CMAKE_CURRENT_LIST_DIR}/third_party/cpp-mcp")
-set(CPP_MCP_ROOT "${CPP_MCP_DEFAULT}" CACHE PATH "Path to hkr04/cpp-mcp source tree")
+set(CPP_MCP_ROOT "${CPP_MCP_DEFAULT}" CACHE PATH "Path to cpp-mcp source tree (submodule: Andersonhere/cpp-mcp)")
 
 if(EXISTS "${CPP_MCP_ROOT}/CMakeLists.txt")
   message(STATUS "Using cpp-mcp at ${CPP_MCP_ROOT}")
@@ -230,7 +230,7 @@ elseif(EXISTS "${CMAKE_CURRENT_LIST_DIR}/../cpp-mcp-upstream/CMakeLists.txt")
   ...
 else()
   include(FetchContent)
-  FetchContent_Declare(cpp_mcp_upstream GIT_REPOSITORY https://github.com/hkr04/cpp-mcp.git ...)
+  FetchContent_Declare(cpp_mcp_upstream GIT_REPOSITORY https://github.com/Andersonhere/cpp-mcp.git ...)
 endif()
 
 set(MCP_BUILD_TESTS OFF CACHE BOOL "" FORCE)

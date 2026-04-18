@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # Default: git submodule at mcp/third_party/cpp-mcp (see repo root .gitmodules).
 # Override with -DCPP_MCP_ROOT=... or fall back to legacy sibling / FetchContent.
 set(CPP_MCP_DEFAULT "${CMAKE_CURRENT_LIST_DIR}/third_party/cpp-mcp")
-set(CPP_MCP_ROOT "${CPP_MCP_DEFAULT}" CACHE PATH "Path to hkr04/cpp-mcp source tree")
+set(CPP_MCP_ROOT "${CPP_MCP_DEFAULT}" CACHE PATH "Path to cpp-mcp source tree (submodule: Andersonhere/cpp-mcp)")
 
 if(EXISTS "${CPP_MCP_ROOT}/CMakeLists.txt")
   message(STATUS "Using cpp-mcp at ${CPP_MCP_ROOT}")
@@ -18,12 +18,12 @@ else()
   include(FetchContent)
   FetchContent_Declare(
     cpp_mcp_upstream
-    GIT_REPOSITORY https://github.com/hkr04/cpp-mcp.git
+    GIT_REPOSITORY https://github.com/Andersonhere/cpp-mcp.git
     GIT_TAG main
     GIT_SHALLOW TRUE
   )
   FetchContent_MakeAvailable(cpp_mcp_upstream)
-  set(CPP_MCP_ROOT "${cpp_mcp_upstream_SOURCE_DIR}" CACHE PATH "Path to hkr04/cpp-mcp source tree" FORCE)
+  set(CPP_MCP_ROOT "${cpp_mcp_upstream_SOURCE_DIR}" CACHE PATH "Path to cpp-mcp source tree" FORCE)
 endif()
 
 set(MCP_BUILD_TESTS OFF CACHE BOOL "" FORCE)

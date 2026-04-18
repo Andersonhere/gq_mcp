@@ -1,4 +1,4 @@
 [submodule "mcp/third_party/cpp-mcp"]
 	path = mcp/third_party/cpp-mcp
-	url = https://github.com/hkr04/cpp-mcp.git
+	url = git@github.com:Andersonhere/cpp-mcp.git
 	branch = main
