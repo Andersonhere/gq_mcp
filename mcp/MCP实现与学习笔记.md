@@ -1,6 +1,6 @@
 # MCP 学习服务实现笔记（`learn_mcp_server`）
 
-本文整理本仓库中 **C++ MCP 学习服务** 从选型到运行、再到 Cursor 接入的完整过程，并说明**每一步在协议与工程上的作用**。文末增加 **与 `learn_mcp_server.cpp`、`CMakeLists.txt` 逐段对照的源码导读**，便于把文字和真实代码对上号。
+本文整理本仓库中 **C++ MCP 学习服务** 从选型到运行、再到 Cursor 接入的完整过程，并说明**每一步在协议与工程上的作用**；**「四（续）」**从协议顺序概括 **MCP 客户端与服务端的典型交互链**。文末增加 **与 `learn_mcp_server.cpp`、`CMakeLists.txt` 逐段对照的源码导读**，便于把文字和真实代码对上号。
 
 > **线上副本（GitHub Pages）**：[C++ MCP 学习服务实现笔记](https://andersonhere.github.io/cpp-mcp-learn-server-note/) — 正文修订以本仓库本文件为准。
 
@@ -209,6 +209,62 @@ cmake --build build --target learn_mcp_server -j"$(nproc)"
 
 - Cursor 作为 **MCP Client**，通过 **Streamable HTTP** 与你在步骤 8、9 起的服务通信；
 - **`/mcp`** 必须与 cpp-mcp 默认的 **Streamable HTTP 端点**一致（见启动时 stderr 打印的路径说明）。
+
+---
+
+## 四（续）、MCP 与客户端的交互链
+
+本节从**协议顺序**概括宿主（**客户端**，例如 Cursor）与 **`learn_mcp_server`（服务端）** 在一次典型会话里如何对话。应用层一律是 **JSON-RPC 2.0**；本服务使用 **Streamable HTTP**（常见为对 **`/mcp`** 的 `POST` / `GET` / `DELETE` 等，具体以 `cpp-mcp` 与启动日志为准）。
+
+### 1. 建连与传输
+
+客户端根据配置（例如 `~/.cursor/mcp.json` 中的 `url`）与本进程建立 **HTTP** 连接；`cpp-mcp` 在同一路径上收发 JSON-RPC，并处理会话 ID、流式帧等传输细节。
+
+### 2. 握手：`initialize` → `initialized`
+
+1. **客户端 → 服务端**：`initialize`（携带客户端标识、协议版本等）。
+2. **服务端 → 客户端**：`initialize` 的**结果**，其中包含你在 `learn_mcp_server.cpp` 里通过 API 写入的元数据与能力摘要，例如：
+   - **`set_server_info(name, version)`**：服务端名称与版本（日志与多服务区分）；
+   - **`set_instructions(...)`**：面向模型/用户的自然语言说明（非 JSON Schema）；
+   - **`set_capabilities(...)`**：声明是否支持 **tools / resources / prompts** 及 `listChanged` 等能力位。
+3. **客户端 → 服务端**：`initialized`，表示宿主已接受协商结果。
+
+在规范语义上，宿主应在握手完成后再大量调用 `tools/*`、`resources/*` 等业务方法。
+
+### 3. 发现能力：各类 `list`
+
+客户端按需调用 **JSON-RPC 方法**拉清单，服务端返回列表（及 schema 等），例如：
+
+| 方法 | 作用 |
+|------|------|
+| `tools/list` | 列出工具与 `inputSchema` |
+| `resources/list` | 列出静态资源 URI |
+| `resources/templates/list` | 列出参数化资源模板 |
+| `prompts/list` | 列出提示模板（本示例通过 **`register_method`** 自行挂载） |
+
+### 4. 使用能力：`call` / `read` / `get`
+
+| 方法 | 作用 |
+|------|------|
+| `tools/call` | 按名称与 JSON 参数执行已注册的 handler；正常返回 **content** 数组（如 `type: text`）；参数非法时可 **`throw mcp::mcp_exception`**，由库映射为 JSON-RPC 错误或带错误标记的调用结果。 |
+| `resources/read` | 按 URI 读取资源正文或 blob。 |
+| `prompts/get` | 按名称取一条模板化消息链（本示例含纯文本与 **embedded resource**）。 |
+
+以上多为**请求—响应**；宿主可随时再次 `list` 或多次 `call`。
+
+### 5. 保活与其它
+
+- **`ping`**：探活，一般由库实现。
+- **通知类能力与列表变更**（若在 `capabilities` 中声明）：属于进阶话题；本学习服务主要演示静态列表与同步调用即可。
+
+### 6. 与本仓库代码的对应关系
+
+| 协议阶段 / 方法 | 在本项目中的体现 |
+|----------------|------------------|
+| `initialize` 结果 | `set_server_info`、`set_instructions`、`set_capabilities` |
+| `tools/list` / `tools/call` | `register_tool` 与各个 handler |
+| `resources/list` / `resources/read` / `resources/templates/list` | `register_resource`、`register_resource_template` |
+| `prompts/list` / `prompts/get` | `register_prompt_handlers` 内的 `register_method` |
 
 ---
 
