@@ -5,7 +5,13 @@ learn_mcp_server — 部署与本地 Cursor 连接
 
 一、在服务器上编译
 -----------------
-  cd /path/to/wkspace/mcp
+  推荐从仓库根目录（gq_mcp/）一键配置：
+  cd /path/to/gq_mcp
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build --target learn_mcp_server -j$(nproc)
+
+  也可仅在 mcp/ 子目录构建（与旧文档一致）：
+  cd /path/to/gq_mcp/mcp
   cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
   cmake --build build --target learn_mcp_server -j$(nproc)
 
