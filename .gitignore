@@ -1,0 +1,12 @@
+# Large vendored trees not part of this MCP project
+/googleapis/
+
+# Legacy cpp-mcp tree (replaced by git submodule mcp/third_party/cpp-mcp)
+/cpp-mcp-upstream/
+
+# Editor / OS
+.DS_Store
+*.swp
+
+# Build outputs (anywhere)
+**/cmake-build-*/

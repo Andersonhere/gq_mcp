@@ -1,0 +1,55 @@
+learn_mcp_server — 部署与本地 Cursor 连接
+========================================
+
+实现步骤、协议含义与自测顺序见同目录: MCP实现与学习笔记.md
+
+一、在服务器上编译
+-----------------
+  cd /path/to/wkspace/mcp
+  cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
+  cmake --build build --target learn_mcp_server -j$(nproc)
+
+  可执行文件: build/learn_mcp_server
+
+  依赖: 在仓库根目录执行一次  git submodule update --init --recursive
+        以拉取 mcp/third_party/cpp-mcp（hkr04/cpp-mcp）。未初始化时 CMake 可能回退到 ../cpp-mcp-upstream 或 FetchContent。
+
+二、运行（监听所有网卡示例）
+---------------------------
+  建议在固定工作目录下启动（会生成 ./data/sample_notes.txt 供 file 资源演示）:
+
+  cd /path/to/wkspace/mcp
+  ./build/learn_mcp_server --host 0.0.0.0 --port 8080
+
+  systemd 示例里请设置 WorkingDirectory= 为上述目录。
+
+  日志请查看进程标准错误输出；勿向标准输出打印杂项（避免干扰 MCP 客户端）。
+
+  端点（由 cpp-mcp 实现）:
+  - Streamable HTTP (MCP 2025-03-26): 路径 /mcp
+  - 旧版 HTTP+SSE: /sse 与 /message
+
+三、防火墙与安全
+----------------
+  对外开放 TCP 端口（示例 8080）:
+  - ufw:   sudo ufw allow 8080/tcp && sudo ufw reload
+  - 云厂商安全组: 放行入站 8080（或你选用的端口）
+
+  生产环境建议在 MCP 前加反向代理（nginx/caddy）做 TLS 与访问控制；本学习进程未内置鉴权。
+
+四、在本地 Cursor 里添加远程 MCP
+--------------------------------
+  在 Cursor 的 MCP 配置中增加一项（名称可自定），将 URL 指向服务器上的 Streamable HTTP 端点，例如:
+
+  http://YOUR_SERVER_IP:8080/mcp
+
+  若前面有 HTTPS 反代，则使用:
+
+  https://your.domain/mcp
+
+  具体配置文件位置随 Cursor 版本可能为「设置 → MCP」或项目/用户级 JSON；以官方文档为准。
+
+五、自测（可选）
+--------------
+  在同一台机器上: ./build/learn_mcp_server --host 127.0.0.1 --port 18080
+  再用支持 Streamable HTTP 的 MCP 客户端连 http://127.0.0.1:18080/mcp 做联调。

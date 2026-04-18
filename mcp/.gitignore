@@ -1,0 +1,5 @@
+build/
+cmake-build-*/
+learn_mcp_server.log
+learn_mcp_server.pid
+data/
